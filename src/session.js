@@ -209,6 +209,7 @@ export class CallSession extends EventEmitter {
   async say(text) {
     if (!this.disclosed) {
       text = disclosure + text;
+      if (this.brief.record) text = 'This call is being recorded. ' + text;
       this.disclosed = true;
     }
     this.turn('agent', text);

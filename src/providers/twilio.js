@@ -30,6 +30,16 @@ export class TwilioPhone {
       statusCallbackMethod: 'POST',
       timeout: 45,
       timeLimit: session.brief.maxMinutes * 60,
+      ...(session.brief.record
+        ? {
+            record: true,
+            recordingChannels: 'dual',
+            recordingTrack: 'both',
+            recordingStatusCallback: `${this.config.publicUrl}/twilio/recording/${session.id}`,
+            recordingStatusCallbackMethod: 'POST',
+            recordingStatusCallbackEvent: ['completed', 'absent'],
+          }
+        : {}),
     });
     return call.sid;
   }

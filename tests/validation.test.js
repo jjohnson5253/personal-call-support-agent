@@ -29,6 +29,9 @@ test('only known modes and bounded user brief fields are accepted', () => {
   assert.equal(callSchema.safeParse({ ...brief, mode: 'sip' }).success, false);
   assert.equal(callSchema.safeParse({ ...brief, goal: 'a'.repeat(6001) }).success, false);
   assert.equal(callSchema.safeParse({ ...brief, arbitrary: 'secret' }).success, false);
+  assert.equal(callSchema.safeParse({ ...brief, record: true }).success, true);
+  assert.equal(callSchema.safeParse({ ...brief, mode: 'demo', record: true }).success, false);
+  assert.equal(callSchema.safeParse({ ...brief, record: 'yes' }).success, false);
 });
 test('public callback URL requires HTTPS root without userinfo, path, or query', () => {
   assert.equal(

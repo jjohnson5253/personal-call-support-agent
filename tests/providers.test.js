@@ -82,6 +82,20 @@ test('Twilio call creation sets server callbacks and an independent provider dur
   assert.equal(request.statusCallbackMethod, 'POST');
   assert.match(request.twiml, /<Connect>/);
   assert.equal(request.to, '+13125550124');
+  assert.equal(request.record, undefined);
+  await phone.dial({
+    id: 'recorded-call',
+    mediaToken: 'token',
+    brief: { to: '+13125550124', maxMinutes: 45, record: true },
+  });
+  assert.equal(request.record, true);
+  assert.equal(request.recordingChannels, 'dual');
+  assert.equal(request.recordingTrack, 'both');
+  assert.equal(
+    request.recordingStatusCallback,
+    'https://example.com/twilio/recording/recorded-call',
+  );
+  assert.deepEqual(request.recordingStatusCallbackEvent, ['completed', 'absent']);
 });
 test('transcriber waits for session.updated, bounds initial audio, commits local VAD, and closes intentionally', async () => {
   class Socket extends EventEmitter {

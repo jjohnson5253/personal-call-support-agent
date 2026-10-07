@@ -15,6 +15,7 @@ import { TwilioTransport, BrowserTransport } from './transport.js';
 export function createApp({
   configStore,
   port = 3000,
+  recordingStore,
   sessionFactory = (brief, config) => new CallSession(brief, config),
   transcriberFactory = (config, callbacks) => new RealtimeTranscriber(config, callbacks),
 }) {
@@ -22,6 +23,7 @@ export function createApp({
     server = createServer(app),
     store = new SessionStore();
   const cookieToken = randomBytes(32).toString('hex');
+  const recordingJobs = new Set();
   app.disable('x-powered-by');
   app.use((req, res, next) => {
     res.set({
@@ -34,9 +36,28 @@ export function createApp({
     next();
   });
   app.post(
-    '/twilio/status/:id',
+    '/twilio/recording/:id',
     express.urlencoded({ extended: false, limit: '16kb' }),
     (req, res) => {
+      if (!recordingStore) return res.sendStatus(404);
+      const session = store.sessions.get(req.params.id);
+      const config = session?.config || configStore.get();
+      if (!signedTwilio(req, config)) return res.sendStatus(403);
+      const event = recordingStore.validateCallback(req.params.id, req.body, config);
+      const work = recordingStore.accept(req.params.id, event, config).catch(() => {
+        session?.publish('error', {
+          message: 'Recording download failed. Retry from Saved recordings.',
+        });
+      });
+      recordingJobs.add(work);
+      work.finally(() => recordingJobs.delete(work));
+      res.sendStatus(204);
+    },
+  );
+  app.post(
+    '/twilio/status/:id',
+    express.urlencoded({ extended: false, limit: '16kb' }),
+    async (req, res) => {
       let session;
       try {
         session = store.get(req.params.id);
@@ -46,6 +67,14 @@ export function createApp({
       if (!signedTwilio(req, session.config)) return res.sendStatus(403);
       if (session.callSid && session.callSid !== req.body.CallSid) return res.sendStatus(403);
       session.providerStatus(req.body.CallStatus);
+      if (
+        session.brief.record &&
+        ['failed', 'busy', 'no-answer', 'canceled'].includes(req.body.CallStatus)
+      )
+        await recordingStore?.markFailed(
+          session.id,
+          'The call did not connect. No recording was produced.',
+        );
       res.sendStatus(204);
     },
   );
@@ -96,7 +125,33 @@ export function createApp({
         error: 'Configure Twilio, a caller number, and a public HTTPS tunnel before dialing.',
       });
     const session = store.add(sessionFactory(brief, config));
-    await session.start();
+    if (brief.record && !recordingStore) {
+      store.sessions.delete(session.id);
+      return res.status(400).json({ error: 'Recording storage is unavailable.' });
+    }
+    try {
+      if (brief.record) await recordingStore.prepare(session);
+    } catch {
+      store.sessions.delete(session.id);
+      throw new Error('Recording directory is not writable. Check your recording folder.');
+    }
+    try {
+      await session.start();
+    } catch (error) {
+      if (brief.record)
+        await recordingStore.markFailed(session.id, 'The call could not be started.');
+      throw error;
+    }
+    if (brief.record) {
+      try {
+        await recordingStore.setCall(session.id, session.callSid);
+      } catch {
+        session.publish('error', {
+          message:
+            'Recording metadata could not be saved. Check disk space. Twilio may still have the audio.',
+        });
+      }
+    }
     res.status(201).json(session.snapshot());
   });
   app.get('/api/sessions/:id', (req, res) => res.json(store.get(req.params.id).snapshot()));
@@ -151,6 +206,30 @@ export function createApp({
     store.sessions.delete(session.id);
     res.sendStatus(204);
   });
+  app.get('/api/recordings', (req, res) =>
+    res.json({
+      directory: recordingStore?.directory || '',
+      recordings: recordingStore?.list() || [],
+    }),
+  );
+  app.get('/api/recordings/:id/audio', async (req, res) => {
+    if (!recordingStore) return res.sendStatus(404);
+    const path = await recordingStore.audioPath(req.params.id);
+    res.type('audio/mpeg');
+    if (req.query.download === '1')
+      res.attachment(recordingStore.filename(recordingStore.get(req.params.id)));
+    res.sendFile(path);
+  });
+  app.post('/api/recordings/:id/retry', async (req, res) => {
+    if (!recordingStore) return res.sendStatus(404);
+    await recordingStore.retry(req.params.id, configStore.get());
+    res.sendStatus(204);
+  });
+  app.delete('/api/recordings/:id', async (req, res) => {
+    if (!recordingStore) return res.sendStatus(404);
+    await recordingStore.remove(req.params.id);
+    res.sendStatus(204);
+  });
   app.use(express.static(fileURLToPath(new URL('../public', import.meta.url))));
   app.use((error, req, res, next) => {
     if (res.headersSent) return next(error);
@@ -159,7 +238,7 @@ export function createApp({
         error: error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join(' '),
       });
     const safe =
-      /^(Session not found|End the current|Hang-up|Twilio|ElevenLabs|The call|Cannot read|The agent)/.test(
+      /^(Recording|Session not found|End the current|Hang-up|Twilio|ElevenLabs|The call|Cannot read|The agent)/.test(
         error.message,
       );
     res
@@ -201,7 +280,16 @@ export function createApp({
       bindAudio(ws, session, mode, transcriberFactory),
     );
   });
-  return { app, server, store, sockets };
+  return {
+    app,
+    server,
+    store,
+    sockets,
+    drainRecordings: async () => {
+      await Promise.allSettled([...recordingJobs]);
+      await recordingStore?.drain();
+    },
+  };
 }
 
 function bindAudio(socket, session, mode, transcriberFactory) {

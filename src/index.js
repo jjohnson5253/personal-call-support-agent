@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { fileURLToPath } from 'node:url';
 import { ConfigStore } from './config.js';
 import { createApp } from './app.js';
+import { RecordingStore } from './recordings.js';
 
 const port = Number(process.env.PORT || 3000);
 if (!Number.isInteger(port) || port < 1024 || port > 65535)
@@ -9,7 +10,14 @@ if (!Number.isInteger(port) || port < 1024 || port > 65535)
 const configStore = await new ConfigStore(
   fileURLToPath(new URL('../.data', import.meta.url)),
 ).load();
-const { server, store, sockets } = createApp({ configStore, port });
+const recordingStore = await new RecordingStore(
+  process.env.RECORDINGS_DIR || fileURLToPath(new URL('../recordings', import.meta.url)),
+).load();
+const { server, store, sockets, drainRecordings } = createApp({
+  configStore,
+  port,
+  recordingStore,
+});
 server.listen(port, '127.0.0.1', () => {
   console.log(
     `\nPersonal Call Support Agent\nOpen http://localhost:${port}\nDemo works without API keys. Configure providers in Settings to make real calls.\n`,
@@ -36,6 +44,7 @@ async function shutdown() {
   );
   if (results.some((result) => result.status === 'rejected'))
     console.error('A hang-up could not be confirmed. Check the Twilio Console.');
+  await drainRecordings();
   for (const socket of sockets.clients) socket.terminate();
   server.closeAllConnections();
   server.close(() => {

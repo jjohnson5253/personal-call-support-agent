@@ -1,4 +1,5 @@
 import { BrowserAudio } from './audio.js';
+import { renderRecordings } from './recordings.js';
 
 const $ = (id) => document.getElementById(id);
 const terminal = new Set(['ended', 'completed', 'failed', 'busy', 'no-answer', 'canceled']);
@@ -25,6 +26,40 @@ let session,
   events,
   pendingBrief,
   microphoneActive = false;
+let recordingTimer,
+  recordingSignature = '',
+  refreshingRecordings = false;
+async function refreshRecordings() {
+  if (refreshingRecordings) return;
+  refreshingRecordings = true;
+  clearTimeout(recordingTimer);
+  try {
+    const result = await api('recordings');
+    $('recordings-directory').textContent = result.directory ? `Folder: ${result.directory}` : '';
+    const signature = JSON.stringify(result.recordings);
+    if (signature !== recordingSignature) {
+      recordingSignature = signature;
+      renderRecordings(
+        $('recordings-list'),
+        result.recordings,
+        (id) =>
+          attempt(async () => {
+            await api(`recordings/${id}`, { method: 'DELETE' });
+            await refreshRecordings();
+          }),
+        (id) =>
+          attempt(async () => {
+            await api(`recordings/${id}/retry`, { method: 'POST' });
+            await refreshRecordings();
+          }),
+      );
+    }
+    if (result.recordings.some((item) => ['waiting', 'downloading'].includes(item.status)))
+      recordingTimer = setTimeout(() => attempt(refreshRecordings), 4000);
+  } finally {
+    refreshingRecordings = false;
+  }
+}
 const audio = new BrowserAudio((message) => {
   if (message.includes('disconnected') || message.includes('failed')) {
     microphoneActive = false;
@@ -77,6 +112,7 @@ const descriptions = {
 $('mode').addEventListener('change', () => {
   $('mode-description').textContent = descriptions[$('mode').value];
   $('to').required = $('mode').value === 'phone';
+  $('record-call').disabled = $('mode').value !== 'phone';
 });
 const examples = {
   appointment: {
@@ -209,6 +245,7 @@ $('brief-form').addEventListener('submit', (event) => {
     to: $('to').value.replace(/[\s()-]/g, ''),
     maxMinutes: Number($('maxMinutes').value),
     confirmed: true,
+    record: mode === 'phone' && $('record-call').checked,
   };
   if (mode !== 'phone') pendingBrief.to = '';
   if (mode === 'phone' && !/^\+[1-9]\d{7,14}$/.test(pendingBrief.to))
@@ -223,6 +260,9 @@ $('brief-form').addEventListener('submit', (event) => {
         ? 'Browser rehearsal — real AI, no phone call'
         : 'Demo — scripted AI, no phone call';
   $('review-limit').textContent = `${pendingBrief.maxMinutes} minutes`;
+  $('review-recording').textContent = pendingBrief.record
+    ? 'On — saved locally after the call. Twilio also retains a copy.'
+    : 'Off';
   $('confirmed').checked = false;
   $('start-call').disabled = true;
   $('review-result').textContent = '';
@@ -242,6 +282,7 @@ $('start-call').addEventListener('click', () =>
       if (pendingBrief.mode === 'browser') await audio.init();
       const next = await api('sessions', { method: 'POST', body: pendingBrief });
       attachSession(next);
+      attempt(refreshRecordings);
       $('review-dialog').close();
       if (next.brief.mode === 'browser') await audio.connect(next.id);
     } finally {
@@ -350,6 +391,7 @@ function attachSession(next) {
     if (data.type === 'status') {
       session.status = data.status;
       session.paused = data.paused;
+      if (terminal.has(data.status)) attempt(refreshRecordings);
     }
     if (data.type === 'question') session.question = data.text;
     if (data.type === 'summary') {
@@ -484,6 +526,7 @@ $('forget').addEventListener('click', () =>
 
 await attempt(async () => {
   settings = await api('settings');
+  await refreshRecordings();
   const sessions = await api('sessions');
   const recent = sessions.find((item) => !terminal.has(item.status)) || sessions.at(-1);
   if (recent) {

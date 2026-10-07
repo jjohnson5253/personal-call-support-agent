@@ -89,3 +89,76 @@ test('invalid settings errors are visible inside the settings dialog', async ({ 
   await expect(page.locator('#settings-result')).toContainText('public HTTPS tunnel');
   await page.getByRole('button', { name: 'Close settings' }).click();
 });
+test('phone-call review shows the recording choice and supports opting out', async ({ page }) => {
+  await page.route('**/api/settings', (route) =>
+    route.fulfill({
+      json: {
+        browserReady: true,
+        phoneReady: true,
+        fromNumber: '+13125550123',
+        environmentFields: [],
+      },
+    }),
+  );
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Cancel an appointment', exact: true }).click();
+  await page.locator('#mode').selectOption('phone');
+  await page.locator('#to').fill('+13125550124');
+  await expect(page.locator('#record-call')).toBeEnabled();
+  await expect(page.locator('#record-call')).toBeChecked();
+  await page.getByRole('button', { name: 'Review request' }).click();
+  await expect(page.locator('#review-recording')).toContainText('On — saved locally');
+  await page.getByRole('button', { name: 'Edit request' }).click();
+  await page.locator('#record-call').uncheck();
+  await page.getByRole('button', { name: 'Review request' }).click();
+  await expect(page.locator('#review-recording')).toHaveText('Off');
+  await page.getByRole('button', { name: 'Edit request' }).click();
+});
+test('recording library survives reload, renders safely, and offers file download and deletion', async ({
+  page,
+}) => {
+  const id = 'e41a959f-bd36-49a0-b82c-7927d7cf69dd';
+  let recordings = [
+    {
+      id,
+      company: '<img src=x onerror="window.injected=true"> Clinic',
+      createdAt: '2026-10-07T16:00:00.000Z',
+      status: 'ready',
+      filename: `call-2026-10-07T16-00-00-${id}.mp3`,
+      duration: 45,
+      bytes: 2048,
+    },
+  ];
+  await page.route('**/api/recordings', (route) =>
+    route.fulfill({ json: { directory: '/Users/example/recordings', recordings } }),
+  );
+  await page.route(`**/api/recordings/${id}`, async (route) => {
+    recordings = [];
+    await route.fulfill({ status: 204 });
+  });
+  await page.route(`**/api/recordings/${id}/audio?download=1`, (route) =>
+    route.fulfill({
+      contentType: 'audio/mpeg',
+      body: Buffer.from('ID3test-audio'),
+      headers: { 'Content-Disposition': `attachment; filename="${recordings[0].filename}"` },
+    }),
+  );
+  await page.goto('/');
+  await expect(page.locator('#recordings-list audio')).toHaveAttribute('controls', '');
+  await expect(page.locator('#recordings-directory')).toContainText('/Users/example/recordings');
+  await expect(page.locator('#recordings-list')).toContainText('<img src=x');
+  expect(await page.evaluate(() => window.injected)).toBeUndefined();
+  for (const width of [1440, 390, 320]) {
+    await page.setViewportSize({ width, height: 1000 });
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    ).toBeTruthy();
+  }
+  await page.reload();
+  await expect(page.locator('#recordings-list audio')).toBeVisible();
+  const download = page.waitForEvent('download');
+  await page.getByRole('link', { name: 'Download MP3' }).click();
+  expect((await download).suggestedFilename()).toMatch(/\.mp3$/);
+  await page.getByRole('button', { name: 'Delete local recording' }).click();
+  await expect(page.locator('#recordings-list')).toContainText('No recorded calls yet');
+});

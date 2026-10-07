@@ -107,6 +107,15 @@
               <p id="mode-description" class="helper">
                 A scripted agent you can try right now. Play the company using the sample responses.
               </p>
+              <label class="confirmation recording-option"
+                ><input id="record-call" type="checkbox" checked disabled /><span
+                  >Record this call and automatically save an MP3 on this computer.</span
+                ></label
+              >
+              <p class="helper recording-option">
+                Real calls only. Enable recording only when permitted. Twilio also keeps a copy; the
+                agent announces recording in its first spoken response.
+              </p>
               <div class="start-row">
                 <div class="limit">
                   <label for="maxMinutes">Time limit</label
@@ -243,6 +252,15 @@
             </div>
           </section>
         </div>
+        <section class="card recordings-panel" aria-labelledby="recordings-heading">
+          <div class="section-heading">
+            <span class="step">03</span>
+            <h2 id="recordings-heading">Saved recordings</h2>
+          </div>
+          <p class="helper">Finished calls are saved here as files, outside browser storage.</p>
+          <p id="recordings-directory" class="helper recording-path"></p>
+          <div id="recordings-list"><p class="helper">No recorded calls yet.</p></div>
+        </section>
         <footer>
           <span>Built for the calls you’d rather skip.</span
           ><span
@@ -397,6 +415,8 @@
         <dd id="review-connection"></dd>
         <dt>Time limit</dt>
         <dd id="review-limit"></dd>
+        <dt>Recording</dt>
+        <dd id="review-recording"></dd>
       </dl>
       <p class="helper">
         Your agent identifies itself as an AI assistant. It asks you for missing details and

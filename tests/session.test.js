@@ -61,6 +61,12 @@ test('manual hang-up never fabricates a successful outcome', async (t) => {
   assert.equal(session.outcome, 'unknown');
   assert.match(session.summary, /No completed outcome/);
 });
+test('recorded calls announce recording in the first spoken response', async (t) => {
+  const session = trackedSession(t, {}, { record: true });
+  await session.start();
+  await turn(session, 'Hello, how can I help?');
+  assert.match(session.history.at(-1).text, /^This call is being recorded\. I’m an AI assistant/);
+});
 test('pause cancels a pending decision and resume retries with current context', async (t) => {
   let resolve,
     count = 0;

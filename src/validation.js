@@ -53,10 +53,17 @@ export const callSchema = z
     details: z.string().trim().max(6000).default(''),
     to: phone.or(z.literal('')).default(''),
     maxMinutes: z.number().int().min(1).max(60).default(45),
+    record: z.boolean().default(false),
     confirmed: z.literal(true, { error: 'Confirm the brief before starting.' }),
   })
   .strict()
   .superRefine((call, ctx) => {
+    if (call.record && call.mode !== 'phone')
+      ctx.addIssue({
+        code: 'custom',
+        path: ['record'],
+        message: 'Audio recording is available for real phone calls.',
+      });
     if (call.mode === 'phone' && !phone.safeParse(call.to).success) {
       ctx.addIssue({
         code: 'custom',

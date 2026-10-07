@@ -88,6 +88,24 @@ During the call you can:
 
 The agent identifies itself as an AI assistant on its first spoken turn. It is instructed to act only within the brief, wait through hold announcements, request missing information, and ask before accepting fees or extra commitments. It cannot bypass account-holder verification. AI decisions and transcripts can be wrong; these instructions are not a formal guarantee. A phone hang-up never counts as confirmation that the task succeeded.
 
+## Local call recordings
+
+Real phone calls have **Record this call** enabled by default in the dashboard. You can turn it off before reviewing the request. When enabled, the agent announces recording in its first spoken response. Enable it only when recording is permitted for your call.
+
+Twilio records both sides in dual-channel audio, then sends a signed completion callback. The Node server automatically downloads the finished MP3 into **`recordings/` inside this repository**, alongside a small JSON metadata file. This is a normal directory on your computer: no localStorage, IndexedDB, or browser download prompt is required. Twilio also retains its provider-side copy; this feature does not remove that copy.
+
+Choose another directory in `.env`, then restart the server:
+
+```sh
+RECORDINGS_DIR=/Users/yourname/Documents/CallRecordings
+```
+
+**Saved recordings** shows the exact folder and includes playback, Download MP3, Retry download, and Delete local recording. Files and the recording library survive server restarts. Audio is protected by the same localhost authentication as the dashboard; the tunnel cannot serve it. Local files use `0600` permissions and the directory uses `0700` on Unix. `recordings/` is git-ignored; keep custom recording folders outside Git checkouts.
+
+Keep the server and tunnel running after hanging up until the recording is ready. A failed download remains retryable, and Retry download can recover a missed callback using the saved call ID. Partial downloads are never offered as playable files. Downloads have a two-minute timeout and a 128 MiB limit. If the app is stopped mid-download, it shows the interrupted recording as failed on the next start; retry using the original Twilio account credentials. Twilio recording/storage charges may apply.
+
+Deleting a transcript does not delete its audio. Delete local recording removes only the app’s local audio and metadata, not the Twilio copy. Browser rehearsal and the scripted demo do not create call recordings.
+
 ## Audio pipeline
 
 ```text
@@ -110,7 +128,7 @@ Twilio Media Streams do not support outgoing DTMF messages. This app updates the
 
 - The server binds to `127.0.0.1`. Dashboard controls require a local host, an HttpOnly session cookie, and same-origin mutation requests. Forwarded dashboard requests are rejected. Only signed Twilio routes are reachable through the public tunnel.
 - Saved credentials are **plaintext on disk** in git-ignored `.data/settings.json`, protected with file permissions (`0600` file / `0700` directory on Unix). They are not stored in browser storage or returned by the settings API. Clear saved settings in the dashboard; environment values must be removed separately. A keychain integration is not included.
-- Audio is streamed, not recorded to local files. Briefs and transcripts remain in server memory: at most 20 sessions, 200 transcript turns per session, and 500 non-audio events per session. Restarting the server loses them. Downloads are saved only when you request them.
+- With recording enabled, completed real-call audio is downloaded automatically to the local recording directory and remains there until you delete it. Briefs and transcripts remain in server memory: at most 20 sessions, 200 transcript turns per session, and 500 non-audio events per session. Restarting the server loses transcripts but preserves saved audio and recording metadata.
 - Providers process the audio, text, and authentication credentials required for their services. The app sets `store: false` for OpenAI Responses; that does not disable every provider’s retention or logging policy. Provider-side records are not deleted by deleting a local transcript.
 - One active session at a time. Calls have a selected limit of 1–60 minutes (45 by default), enforced locally and through Twilio’s call time limit. Closing the browser does not stop a real call. Use **End call**, stop the server gracefully, or end the call in Twilio Console. A forced process kill or network outage can leave the call running until Twilio’s limit.
 - This is an initial implementation. Provider interactions are covered with mocks and signed local stream tests; a live paid call has not been validated. Hold music, noisy lines, long pauses, interruptions, and provider limits need real-world testing and VAD tuning. Use headphones during microphone rehearsal. There is no browser-to-PSTN calling, human audio takeover, or incoming-call support yet.
