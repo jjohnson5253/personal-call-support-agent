@@ -1,0 +1,59 @@
+{
+  "name": "personal-call-support-agent",
+  "version": "0.1.0",
+  "description": "A local AI agent that calls customer support for you, with OpenAI, ElevenLabs, and Twilio.",
+  "main": "src/index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --test tests/*.test.js",
+    "check": "eslint .",
+    "test:ui": "playwright test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jjohnson5253/personal-call-support-agent.git"
+  },
+  "keywords": [
+    "ai",
+    "voice-agent",
+    "customer-support",
+    "twilio",
+    "openai",
+    "elevenlabs"
+  ],
+  "author": "",
+  "license": "MIT",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/jjohnson5253/personal-call-support-agent/issues"
+  },
+  "homepage": "https://github.com/jjohnson5253/personal-call-support-agent#readme",
+  "dependencies": {
+    "dotenv": "^18.0.6",
+    "express": "^5.2.1",
+    "openai": "^7.30.0",
+    "twilio": "^6.1.2",
+    "ws": "^8.22.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.63.0",
+    "eslint": "^9.39.5",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.9"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "prettier": {
+    "singleQuote": true,
+    "printWidth": 100
+  }
+}

@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f6f7f9" />
+    <title>Personal Call Support Agent</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles.css" />
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <a class="brand" href="/"
+          ><span class="brand-icon" aria-hidden="true">↗</span
+          ><span>callside<span class="brand-sub">Personal Call Support Agent</span></span></a
+        >
+        <div class="top-actions">
+          <span class="local-badge"><i></i> Runs on your computer</span
+          ><button id="open-settings" class="button secondary">
+            Settings <span aria-hidden="true">↗</span>
+          </button>
+        </div>
+      </header>
+      <main>
+        <section class="intro">
+          <div>
+            <div class="eyebrow">LESS HOLD MUSIC. MORE LIFE.</div>
+            <h1>Your time.<br /><span>Back.</span></h1>
+            <p>
+              Give your agent one thing to handle.<br />Let it do the talking, the waiting, and the
+              asking.
+            </p>
+          </div>
+          <div class="intro-art" aria-hidden="true">
+            <div class="orbit orbit-one"></div>
+            <div class="orbit orbit-two"></div>
+            <div class="orbit orbit-three"></div>
+            <div class="audio-pill">
+              <b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b>
+            </div>
+            <span class="art-note">We’ll take it from here.</span>
+          </div>
+        </section>
+        <div id="notice" class="notice" role="status" hidden></div>
+        <div class="workspace">
+          <section class="card compose">
+            <div class="section-heading">
+              <span class="step">01</span>
+              <h2>What can we take off your plate?</h2>
+            </div>
+            <div class="example-list">
+              <button class="chip" data-example="appointment">Cancel an appointment</button
+              ><button class="chip" data-example="flight">Ask about a flight</button
+              ><button class="chip" data-example="benefits">Check my benefits</button>
+            </div>
+            <form id="brief-form">
+              <label for="goal">Your request</label
+              ><textarea
+                id="goal"
+                name="goal"
+                rows="4"
+                maxlength="6000"
+                required
+                minlength="10"
+                placeholder="Cancel my physical therapy appointment on Friday at 2 pm. Ask for confirmation and check whether there’s a cancellation fee."
+              ></textarea>
+              <div class="two-columns">
+                <div>
+                  <label for="company">Company</label
+                  ><input
+                    id="company"
+                    name="company"
+                    maxlength="120"
+                    required
+                    placeholder="e.g. My physical therapy clinic"
+                  />
+                </div>
+                <div>
+                  <label for="to">Support number <span class="optional">for real calls</span></label
+                  ><input
+                    id="to"
+                    name="to"
+                    type="tel"
+                    placeholder="+1 312 555 0123"
+                    autocomplete="off"
+                  />
+                </div>
+              </div>
+              <label for="details"
+                >Details your agent should know <span class="optional">optional</span></label
+              ><textarea
+                id="details"
+                name="details"
+                rows="3"
+                maxlength="6000"
+                placeholder="Your name, appointment date, booking reference, and any limits. Share only what this call needs."
+              ></textarea>
+              <div class="form-divider"></div>
+              <label for="mode">How would you like to start?</label>
+              <select id="mode" name="mode">
+                <option value="demo">Try the demo · no keys or calls</option>
+                <option value="browser">Browser rehearsal · OpenAI + ElevenLabs</option>
+                <option value="phone">Real phone call · Twilio number</option>
+              </select>
+              <p id="mode-description" class="helper">
+                A scripted agent you can try right now. Play the company using the sample responses.
+              </p>
+              <div class="start-row">
+                <div class="limit">
+                  <label for="maxMinutes">Time limit</label
+                  ><select id="maxMinutes">
+                    <option value="10">10 minutes</option>
+                    <option value="30">30 minutes</option>
+                    <option value="45" selected>45 minutes</option>
+                    <option value="60">60 minutes</option>
+                  </select>
+                </div>
+                <button class="button primary" id="review-call" type="submit">
+                  Review request <span aria-hidden="true">→</span>
+                </button>
+              </div>
+            </form>
+            <p class="privacy-note">
+              <span aria-hidden="true">◇</span> Credentials stay on your computer. Calls use your
+              provider accounts.
+            </p>
+          </section>
+          <section class="card call-panel" aria-labelledby="call-heading">
+            <div class="call-panel-top">
+              <div class="section-heading">
+                <span class="step">02</span>
+                <h2 id="call-heading">Your agent’s workspace</h2>
+              </div>
+              <span id="status" class="status-tag">Ready when you are</span>
+            </div>
+            <div id="empty-state" class="empty-state">
+              <div class="empty-icon" aria-hidden="true">
+                <span></span><span></span><span></span><span></span><span></span>
+              </div>
+              <h3>One less call on your list.</h3>
+              <p>
+                Review your request to get started.<br />The conversation will appear here as it
+                happens.
+              </p>
+              <div class="empty-features">
+                <span>Phone menu navigation</span><span>Live transcript</span
+                ><span>Private guidance</span>
+              </div>
+            </div>
+            <div id="active-session" hidden>
+              <div class="session-meta">
+                <span id="session-company"></span><span id="session-mode"></span>
+              </div>
+              <div class="call-controls">
+                <button id="pause-call" class="button secondary small">Pause agent</button
+                ><button id="stop-call" class="button danger small">End session</button
+                ><label class="toggle"
+                  ><input id="listen" type="checkbox" />
+                  <span id="listen-label">Hear demo voice</span></label
+                ><button id="microphone" class="button secondary small" hidden>
+                  Use microphone
+                </button>
+              </div>
+              <div id="question-box" class="question-box" hidden>
+                <span class="eyebrow">YOUR AGENT NEEDS YOU</span>
+                <p id="question-text"></p>
+              </div>
+              <div
+                id="transcript"
+                class="transcript"
+                aria-live="polite"
+                aria-label="Conversation transcript"
+              ></div>
+              <div id="summary-box" class="summary-box" hidden>
+                <span class="eyebrow" id="outcome-label">CALL SUMMARY</span>
+                <p id="summary-text"></p>
+              </div>
+              <form id="guide-form" class="inline-form">
+                <label for="guidance">Send private guidance to your agent</label>
+                <div class="input-row">
+                  <input
+                    id="guidance"
+                    maxlength="4000"
+                    placeholder="Answer a question or give a new instruction…"
+                    required
+                  /><button class="button primary small" type="submit">Send</button>
+                </div>
+              </form>
+              <details id="keypad">
+                <summary>Send keypad input</summary>
+                <form id="digits-form" class="input-row">
+                  <label class="sr-only" for="digits">Digits</label
+                  ><input
+                    id="digits"
+                    maxlength="24"
+                    pattern="[0-9*#wW]+"
+                    placeholder="e.g. 1 or 1234#"
+                    required
+                  /><button class="button secondary small" type="submit">Send tones</button>
+                </form>
+              </details>
+              <div id="rehearsal" class="rehearsal">
+                <span class="eyebrow">PLAY THE COMPANY</span>
+                <div id="demo-buttons" class="demo-buttons">
+                  <button
+                    class="chip"
+                    data-line="Thank you for calling. For appointments, press 1."
+                  >
+                    Phone menu</button
+                  ><button
+                    class="chip"
+                    data-line="Please hold for the next available representative."
+                  >
+                    Put on hold</button
+                  ><button class="chip" data-line="Hello, how can I help you today?">
+                    Live agent</button
+                  ><button class="chip" data-line="Can you confirm your date of birth?">
+                    Ask for details</button
+                  ><button
+                    class="chip"
+                    data-line="Your appointment has been canceled. Confirmation number is DEMO-123. There is no cancellation fee."
+                  >
+                    Confirm cancellation
+                  </button>
+                </div>
+                <form id="transcript-form" class="input-row">
+                  <label class="sr-only" for="company-line">Company response</label
+                  ><input
+                    id="company-line"
+                    maxlength="4000"
+                    placeholder="Type what the company says…"
+                    required
+                  /><button class="button secondary small" type="submit">Reply</button>
+                </form>
+                <p class="helper">Rehearsal only. No support number is dialed.</p>
+              </div>
+              <div class="transcript-actions">
+                <button id="download" class="text-button">Download transcript</button
+                ><button id="forget" class="text-button" disabled>Delete transcript</button>
+              </div>
+            </div>
+          </section>
+        </div>
+        <footer>
+          <span>Built for the calls you’d rather skip.</span
+          ><span
+            >OpenAI listens &amp; decides <i>·</i> ElevenLabs speaks <i>·</i> Twilio connects</span
+          >
+        </footer>
+      </main>
+    </div>
+    <dialog id="settings-dialog" class="modal settings-modal">
+      <div class="modal-header">
+        <div>
+          <div class="eyebrow">YOUR PROVIDERS, YOUR AGENT</div>
+          <h2>Connect your accounts</h2>
+        </div>
+        <button class="icon-button" data-close="settings-dialog" aria-label="Close settings">
+          ×
+        </button>
+      </div>
+      <p class="helper">
+        Sign in to each provider’s dashboard, create credentials, and paste them here. This app uses
+        API keys. ChatGPT sign-in doesn’t cover the live transcription used here.
+      </p>
+      <form id="settings-form">
+        <div class="provider-section">
+          <div class="provider-title">
+            <span class="provider-number">1</span>
+            <h3>OpenAI</h3>
+            <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer"
+              >Get an API key ↗</a
+            >
+          </div>
+          <label for="openaiKey"
+            >API key <span id="openaiKey-state" class="saved-state"></span></label
+          ><input
+            id="openaiKey"
+            name="openaiKey"
+            type="password"
+            autocomplete="new-password"
+            placeholder="sk-…"
+          />
+        </div>
+        <div class="provider-section">
+          <div class="provider-title">
+            <span class="provider-number">2</span>
+            <h3>ElevenLabs</h3>
+            <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank" rel="noreferrer"
+              >Get an API key ↗</a
+            >
+          </div>
+          <label for="elevenKey"
+            >API key <span id="elevenKey-state" class="saved-state"></span></label
+          ><input
+            id="elevenKey"
+            name="elevenKey"
+            type="password"
+            autocomplete="new-password"
+            placeholder="Your ElevenLabs API key"
+          /><label for="voiceId">Voice ID</label>
+          <div class="input-row">
+            <input
+              id="voiceId"
+              name="voiceId"
+              placeholder="Paste a voice ID, including your own cloned voice"
+            /><button id="load-voices" class="button secondary small" type="button">
+              Load voices
+            </button>
+          </div>
+          <select id="voice-picker" aria-label="Choose an ElevenLabs voice" hidden>
+            <option value="">Choose a voice…</option>
+          </select>
+          <p class="helper">
+            Save your key first, then load voices. For your own voice, create a clone in ElevenLabs
+            and select it here. Use only voices you have permission to use.
+          </p>
+        </div>
+        <div class="provider-section">
+          <div class="provider-title">
+            <span class="provider-number">3</span>
+            <h3>Twilio <span class="optional">real calls only</span></h3>
+            <a href="https://console.twilio.com/" target="_blank" rel="noreferrer"
+              >Open dashboard ↗</a
+            >
+          </div>
+          <div class="two-columns">
+            <div>
+              <label for="twilioSid">Account SID</label
+              ><input id="twilioSid" name="twilioSid" placeholder="AC…" />
+            </div>
+            <div>
+              <label for="twilioToken"
+                >Auth token <span id="twilioToken-state" class="saved-state"></span></label
+              ><input
+                id="twilioToken"
+                name="twilioToken"
+                type="password"
+                autocomplete="new-password"
+                placeholder="Your account auth token"
+              />
+            </div>
+          </div>
+          <label for="fromNumber">Your Twilio voice number</label
+          ><input id="fromNumber" name="fromNumber" type="tel" placeholder="+13125550123" /><label
+            for="publicUrl"
+            >Public HTTPS tunnel URL</label
+          ><input
+            id="publicUrl"
+            name="publicUrl"
+            type="url"
+            placeholder="https://your-tunnel.ngrok-free.app"
+          />
+          <p class="helper">
+            Run <code>ngrok http 3000</code> in a second terminal and paste its HTTPS URL. Keep this
+            computer and tunnel running during calls. The dashboard stays local.
+          </p>
+        </div>
+        <details class="advanced">
+          <summary>Advanced model settings</summary>
+          <label for="model">Decision model</label><input id="model" name="model" /><label
+            for="transcriptionModel"
+            >Transcription model</label
+          ><input id="transcriptionModel" name="transcriptionModel" /><label for="speechModel"
+            >ElevenLabs speech model</label
+          ><input id="speechModel" name="speechModel" />
+        </details>
+        <p class="helper">
+          Saved in <code>.data/settings.json</code> with restrictive file permissions. Values from
+          your environment override saved settings. Blank secret fields keep existing keys.
+        </p>
+        <p id="settings-result" role="status" class="helper"></p>
+        <div class="modal-actions">
+          <button class="text-button" type="button" id="clear-settings">Clear saved settings</button
+          ><button class="button primary" type="submit">Save settings</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="review-dialog" class="modal review-modal">
+      <div class="modal-header">
+        <div>
+          <div class="eyebrow">ONE QUICK LOOK BEFORE WE START</div>
+          <h2>Review your request</h2>
+        </div>
+        <button class="icon-button" data-close="review-dialog" aria-label="Close review">×</button>
+      </div>
+      <dl class="review-list">
+        <dt>Company</dt>
+        <dd id="review-company"></dd>
+        <dt>Task</dt>
+        <dd id="review-goal"></dd>
+        <dt>Details</dt>
+        <dd id="review-details"></dd>
+        <dt>Connection</dt>
+        <dd id="review-connection"></dd>
+        <dt>Time limit</dt>
+        <dd id="review-limit"></dd>
+      </dl>
+      <p class="helper">
+        Your agent identifies itself as an AI assistant. It asks you for missing details and
+        approval for fees or commitments outside this request. AI can misunderstand a call; review
+        the transcript and result.
+      </p>
+      <label class="confirmation"
+        ><input id="confirmed" type="checkbox" /><span
+          >I approve this brief and authorize the agent to handle this request. Real calls use paid
+          provider services.</span
+        ></label
+      >
+      <p id="review-result" class="helper" role="status"></p>
+      <div class="modal-actions">
+        <button class="button secondary" data-close="review-dialog">Edit request</button
+        ><button id="start-call" class="button primary" disabled>Start session →</button>
+      </div>
+    </dialog>
+  </body>
+</html>
